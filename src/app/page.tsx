@@ -19,7 +19,7 @@ export default function Home() {
             ∑
           </div>
           <span className="font-extrabold text-lg bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 tracking-tight">
-            MathGenerator
+            MathGenarator
           </span>
         </div>
         <div className="text-xs text-zinc-400 dark:text-zinc-500 font-mono">
