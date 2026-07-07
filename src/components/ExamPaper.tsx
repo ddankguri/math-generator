@@ -2,31 +2,46 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import MathText from "./MathText";
-import {
-  difficultyLabels,
-  generateFractionAdditionProblems,
-  getFractionAdditionExamMetadata,
-  getFractionAdditionProblemTypes,
-} from "@/engine/generators/fractionAdditionGenerator";
+import { curriculum } from "@/data/curriculum/elementary5";
+import { getExamMetadata, generateProblems, getProblemTypes } from "@/engine/registry";
 import { validateFiveChoiceProblems } from "@/engine/validators/problem";
 import { exportExamPaperPdf } from "@/pdf/exportExamPaperPdf";
-import type { MultipleChoiceProblem, ProblemDifficulty, ProblemTypeCode } from "@/types/problem";
+import { difficultyLabels } from "@/types/problem";
+import type { GeneratedProblem, ProblemDifficulty, ProblemTypeId } from "@/types/problem";
 
 export default function ExamPaper() {
-  const problemTypes = getFractionAdditionProblemTypes();
+  const allProblemTypes = getProblemTypes();
+  const grades = curriculum.map((item) => item.grade);
 
   // Problems state
-  const [problems, setProblems] = useState<MultipleChoiceProblem[]>([]);
+  const [problems, setProblems] = useState<GeneratedProblem[]>([]);
+  const [selectedGrade, setSelectedGrade] = useState<string>("초등 5학년");
+  const [selectedUnit, setSelectedUnit] = useState<string>("분수");
+  const [selectedTopic, setSelectedTopic] = useState<string>("분수의 덧셈");
   const [selectedCount, setSelectedCount] = useState<number>(5); // Default to 5 questions
-  const [selectedProblemType, setSelectedProblemType] = useState<ProblemTypeCode>("FRA_ADD_001");
+  const [selectedProblemType, setSelectedProblemType] = useState<ProblemTypeId>("FRA_ADD_001");
   const [selectedDifficulty, setSelectedDifficulty] = useState<ProblemDifficulty>("normal");
-  const examMetadata = getFractionAdditionExamMetadata(selectedProblemType, selectedDifficulty);
+  const selectedCurriculum = curriculum.find((item) => item.grade === selectedGrade) ?? curriculum[0];
+  const availableUnits = selectedCurriculum.units;
+  const selectedCurriculumUnit = availableUnits.find((unit) => unit.name === selectedUnit) ?? availableUnits[0];
+  const availableTopics = selectedCurriculumUnit.concepts;
+  const availableProblemTypes = allProblemTypes.filter(
+    (type) => type.grade === selectedGrade && type.unit === selectedUnit && type.topic === selectedTopic
+  );
+  const selectedProblemTypeDefinition = availableProblemTypes.find((type) => type.id === selectedProblemType);
+  const availableDifficulties = selectedProblemTypeDefinition?.difficultyLevels ?? ["easy", "normal", "hard"];
+  const examMetadata = selectedProblemTypeDefinition
+    ? getExamMetadata(selectedProblemType, selectedDifficulty)
+    : {
+        title: `${selectedGrade} ${selectedTopic}`,
+        subtitle: "선택한 개념에 구현된 유형이 없습니다.",
+      };
 
   // Modes: 'practice' (연습 모드) | 'exam' (실전 시험 모드)
   const [mode, setMode] = useState<"practice" | "exam">("practice");
-  const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
+  const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [expandedExplanations, setExpandedExplanations] = useState<Record<number, boolean>>({});
+  const [expandedExplanations, setExpandedExplanations] = useState<Record<string, boolean>>({});
 
   // Student Info
   const [studentId, setStudentId] = useState("");
@@ -51,12 +66,17 @@ export default function ExamPaper() {
     typeCode = selectedProblemType,
     difficulty = selectedDifficulty
   ) => {
-    let generatedProblems = generateFractionAdditionProblems({ count, typeCode, difficulty });
+    if (!allProblemTypes.some((type) => type.id === typeCode)) {
+      alert("선택한 조건에 생성 가능한 문제 유형이 없습니다.");
+      return;
+    }
+
+    let generatedProblems = generateProblems({ count, problemTypeId: typeCode, difficulty });
 
     try {
       validateFiveChoiceProblems(generatedProblems);
     } catch {
-      generatedProblems = generateFractionAdditionProblems({ count, typeCode, difficulty });
+      generatedProblems = generateProblems({ count, problemTypeId: typeCode, difficulty });
       validateFiveChoiceProblems(generatedProblems);
     }
 
@@ -71,6 +91,32 @@ export default function ExamPaper() {
   useEffect(() => {
     generateNewExam(5, "FRA_ADD_001", "normal");
   }, []);
+
+  useEffect(() => {
+    if (!availableUnits.some((unit) => unit.name === selectedUnit)) {
+      setSelectedUnit(availableUnits[0]?.name ?? "");
+    }
+  }, [availableUnits, selectedUnit]);
+
+  useEffect(() => {
+    if (!availableTopics.some((topic) => topic.name === selectedTopic)) {
+      setSelectedTopic(availableTopics[0]?.name ?? "");
+    }
+  }, [availableTopics, selectedTopic]);
+
+  useEffect(() => {
+    if (availableProblemTypes.length === 0) return;
+
+    if (!availableProblemTypes.some((type) => type.id === selectedProblemType)) {
+      setSelectedProblemType(availableProblemTypes[0].id);
+    }
+  }, [availableProblemTypes, selectedProblemType]);
+
+  useEffect(() => {
+    if (!availableDifficulties.includes(selectedDifficulty)) {
+      setSelectedDifficulty(availableDifficulties[0]);
+    }
+  }, [availableDifficulties, selectedDifficulty]);
 
   // Timer Effect
   useEffect(() => {
@@ -122,7 +168,7 @@ export default function ExamPaper() {
   };
 
   // Option selection handler
-  const handleSelectOption = (problemId: number, option: string) => {
+  const handleSelectOption = (problemId: string, option: string) => {
     if (isSubmitted && mode === "exam") return; // locked after submission
 
     setUserAnswers((prev) => ({
@@ -150,7 +196,7 @@ export default function ExamPaper() {
 
     setIsSubmitted(true);
     setIsTimerRunning(false);
-    const allExp: Record<number, boolean> = {};
+    const allExp: Record<string, boolean> = {};
     problems.forEach((p) => {
       allExp[p.id] = true;
     });
@@ -158,7 +204,7 @@ export default function ExamPaper() {
   };
 
   // Toggle single explanation
-  const toggleExplanation = (problemId: number) => {
+  const toggleExplanation = (problemId: string) => {
     setExpandedExplanations((prev) => ({
       ...prev,
       [problemId]: !prev[problemId],
@@ -213,21 +259,71 @@ export default function ExamPaper() {
         <div className="flex flex-wrap items-center gap-3">
           
           {/* 1. Problem Count Selector & Generate Button */}
-          <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
+          <div className="flex flex-wrap items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
+            <label htmlFor="grade-select" className="text-xs font-bold text-zinc-500 dark:text-zinc-400 pl-2">
+              학년:
+            </label>
+            <select
+              id="grade-select"
+              value={selectedGrade}
+              onChange={(e) => setSelectedGrade(e.target.value)}
+              className="bg-transparent text-zinc-700 dark:text-zinc-300 text-xs md:text-sm font-bold border-0 focus:ring-0 focus:outline-none cursor-pointer py-1.5 px-1 pr-8"
+            >
+              {grades.map((grade) => (
+                <option key={grade} value={grade}>
+                  {grade}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="unit-select" className="text-xs font-bold text-zinc-500 dark:text-zinc-400 pl-2">
+              단원:
+            </label>
+            <select
+              id="unit-select"
+              value={selectedUnit}
+              onChange={(e) => setSelectedUnit(e.target.value)}
+              className="bg-transparent text-zinc-700 dark:text-zinc-300 text-xs md:text-sm font-bold border-0 focus:ring-0 focus:outline-none cursor-pointer py-1.5 px-1 pr-8"
+            >
+              {availableUnits.map((unit) => (
+                <option key={unit.name} value={unit.name}>
+                  {unit.name}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="topic-select" className="text-xs font-bold text-zinc-500 dark:text-zinc-400 pl-2">
+              개념:
+            </label>
+            <select
+              id="topic-select"
+              value={selectedTopic}
+              onChange={(e) => setSelectedTopic(e.target.value)}
+              className="bg-transparent text-zinc-700 dark:text-zinc-300 text-xs md:text-sm font-bold border-0 focus:ring-0 focus:outline-none cursor-pointer py-1.5 px-1 pr-8"
+            >
+              {availableTopics.map((topic) => (
+                <option key={topic.name} value={topic.name}>
+                  {topic.name}
+                </option>
+              ))}
+            </select>
             <label htmlFor="type-select" className="text-xs font-bold text-zinc-500 dark:text-zinc-400 pl-2">
               유형:
             </label>
             <select
               id="type-select"
-              value={selectedProblemType}
-              onChange={(e) => setSelectedProblemType(e.target.value as ProblemTypeCode)}
-              className="bg-transparent text-zinc-700 dark:text-zinc-300 text-xs md:text-sm font-bold border-0 focus:ring-0 focus:outline-none cursor-pointer py-1.5 px-1 pr-8 max-w-[220px]"
+              value={selectedProblemTypeDefinition ? selectedProblemType : ""}
+              onChange={(e) => setSelectedProblemType(e.target.value as ProblemTypeId)}
+              disabled={availableProblemTypes.length === 0}
+              className="bg-transparent text-zinc-700 dark:text-zinc-300 text-xs md:text-sm font-bold border-0 focus:ring-0 focus:outline-none cursor-pointer py-1.5 px-1 pr-8 max-w-[240px] disabled:text-zinc-400 disabled:cursor-not-allowed"
             >
-              {problemTypes.map((type) => (
-                <option key={type.code} value={type.code}>
-                  {type.code} - {type.title}
-                </option>
-              ))}
+              {availableProblemTypes.length === 0 ? (
+                <option value="">구현된 유형 없음</option>
+              ) : (
+                availableProblemTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.id} - {type.typeName}
+                  </option>
+                ))
+              )}
             </select>
             <label htmlFor="difficulty-select" className="text-xs font-bold text-zinc-500 dark:text-zinc-400 pl-2">
               난이도:
@@ -238,7 +334,7 @@ export default function ExamPaper() {
               onChange={(e) => setSelectedDifficulty(e.target.value as ProblemDifficulty)}
               className="bg-transparent text-zinc-700 dark:text-zinc-300 text-xs md:text-sm font-bold border-0 focus:ring-0 focus:outline-none cursor-pointer py-1.5 px-1 pr-8"
             >
-              {(["easy", "normal", "hard"] as ProblemDifficulty[]).map((difficulty) => (
+              {availableDifficulties.map((difficulty) => (
                 <option key={difficulty} value={difficulty}>
                   {difficultyLabels[difficulty]}
                 </option>
@@ -259,7 +355,8 @@ export default function ExamPaper() {
             </select>
             <button
               onClick={() => generateNewExam(selectedCount, selectedProblemType, selectedDifficulty)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-colors shadow-sm"
+              disabled={!selectedProblemTypeDefinition}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-400 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-colors shadow-sm"
             >
               시험지 생성
             </button>
@@ -482,7 +579,7 @@ export default function ExamPaper() {
             )}
             
             {problems.map((problem) => {
-              if (problem.options.length !== 5) {
+              if (problem.choices.length !== 5) {
                 throw new Error(`Problem ${problem.id} must render exactly 5 choices.`);
               }
 
@@ -549,7 +646,7 @@ export default function ExamPaper() {
 
                   {/* Options List */}
                   <div className="mt-4 space-y-2 pl-6">
-                    {problem.options.map((option, optIdx) => {
+                    {problem.choices.map((option, optIdx) => {
                       const isOptionSelected = selectedAnswer === option;
                       const isOptionCorrect = option === problem.answer;
                       
@@ -638,7 +735,7 @@ export default function ExamPaper() {
                             <MathText text={problem.answer} />
                           </div>
                           <div className="mt-2 text-zinc-600 dark:text-zinc-400 font-serif">
-                            <MathText text={problem.explanation} />
+                            <MathText text={problem.solution} />
                           </div>
                         </div>
                       )}
@@ -658,7 +755,7 @@ export default function ExamPaper() {
                     {problem.id}. 정답: <MathText text={problem.answer} />
                   </div>
                   <div>
-                    풀이: <MathText text={problem.explanation} />
+                    풀이: <MathText text={problem.solution} />
                   </div>
                 </div>
               ))}
@@ -766,7 +863,7 @@ export default function ExamPaper() {
                         </div>
                         
                         {/* OMR Choice Bubbles */}
-                        {prob.options.map((opt, optIdx) => {
+                        {prob.choices.map((opt, optIdx) => {
                           const isOptionSelected = selectedAnswer === opt;
                           const isOptionCorrect = opt === prob.answer;
                           

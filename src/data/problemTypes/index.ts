@@ -1,1 +1,5 @@
-export { elementaryGrade5FractionAdditionTypes } from "./elementaryGrade5FractionAddition";
+export { fractionAdditionProblemTypes } from "./fractionAddition";
+
+import { fractionAdditionProblemTypes } from "./fractionAddition";
+
+export const problemTypes = [...fractionAdditionProblemTypes];

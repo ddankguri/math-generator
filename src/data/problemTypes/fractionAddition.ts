@@ -1,0 +1,58 @@
+import type { ProblemTypeDefinition } from "@/types/problem";
+
+export const fractionAdditionProblemTypes: ProblemTypeDefinition[] = [
+  {
+    id: "FRA_ADD_001",
+    grade: "초등 5학년",
+    unit: "분수",
+    topic: "분수의 덧셈",
+    typeName: "같은 분모의 분수 덧셈",
+    difficultyLevels: ["easy", "normal", "hard"],
+    generatorKey: "fraction.add.sameDenominator",
+    description: "분모가 같은 두 분수의 분자를 더하고 필요한 경우 약분합니다.",
+    sampleProblem: {
+      id: "FRA_ADD_001_EX_001",
+      problem: "\\( \\frac{2}{7} + \\frac{3}{7} \\)을 계산하세요.",
+      answer: "\\( \\frac{5}{7} \\)",
+      solution: "분모가 같으므로 분자끼리 더합니다. \\( \\frac{2+3}{7} = \\frac{5}{7} \\)입니다.",
+    },
+    constraints: ["두 분수의 분모가 같습니다.", "합은 진분수 또는 약분 가능한 진분수로 생성합니다."],
+    commonMistakes: ["분모까지 더하는 오류", "약분을 빠뜨리는 오류"],
+  },
+  {
+    id: "FRA_ADD_002",
+    grade: "초등 5학년",
+    unit: "분수",
+    topic: "분수의 덧셈",
+    typeName: "분모가 배수 관계인 분수 덧셈",
+    difficultyLevels: ["easy", "normal", "hard"],
+    generatorKey: "fraction.add.multipleDenominator",
+    description: "큰 분모를 공통분모로 삼아 통분한 뒤 두 분수를 더합니다.",
+    sampleProblem: {
+      id: "FRA_ADD_002_EX_001",
+      problem: "\\( \\frac{1}{4} + \\frac{3}{8} \\)을 계산하세요.",
+      answer: "\\( \\frac{5}{8} \\)",
+      solution: "\\( \\frac{1}{4} = \\frac{2}{8} \\)이므로 \\( \\frac{2}{8} + \\frac{3}{8} = \\frac{5}{8} \\)입니다.",
+    },
+    constraints: ["한 분모가 다른 분모의 배수입니다.", "통분 후 분자끼리 더하도록 생성합니다."],
+    commonMistakes: ["작은 분모 쪽 분자를 곱하지 않는 오류", "공통분모를 잘못 고르는 오류"],
+  },
+  {
+    id: "FRA_ADD_003",
+    grade: "초등 5학년",
+    unit: "분수",
+    topic: "분수의 덧셈",
+    typeName: "서로소 분모의 분수 덧셈",
+    difficultyLevels: ["easy", "normal", "hard"],
+    generatorKey: "fraction.add.coprimeDenominator",
+    description: "서로소인 두 분모의 곱을 공통분모로 삼아 통분한 뒤 더합니다.",
+    sampleProblem: {
+      id: "FRA_ADD_003_EX_001",
+      problem: "\\( \\frac{2}{3} + \\frac{1}{5} \\)을 계산하세요.",
+      answer: "\\( \\frac{13}{15} \\)",
+      solution: "\\( \\frac{2}{3} = \\frac{10}{15} \\), \\( \\frac{1}{5} = \\frac{3}{15} \\)이므로 \\( \\frac{13}{15} \\)입니다.",
+    },
+    constraints: ["두 분모는 서로소입니다.", "두 분모의 곱을 공통분모로 사용합니다."],
+    commonMistakes: ["최소공배수 대신 한쪽 분모만 쓰는 오류", "통분한 분자를 서로 바꾸어 곱하는 오류"],
+  },
+];

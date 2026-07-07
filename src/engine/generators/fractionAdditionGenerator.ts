@@ -1,4 +1,3 @@
-import { elementaryGrade5FractionAdditionTypes } from "@/data/problemTypes";
 import {
   addFractions,
   formatFraction,
@@ -6,17 +5,12 @@ import {
   type Fraction,
 } from "@/engine/solvers/fractionAddition";
 import { shuffleArray } from "@/engine/utils/array";
-import { validateFiveChoiceProblems } from "@/engine/validators/problem";
 import type {
-  GenerateProblemsOptions,
-  MultipleChoiceProblem,
+  GeneratedProblem,
   ProblemDifficulty,
-  ProblemTypeCode,
-  ProblemsPayload,
+  ProblemTypeDefinition,
 } from "@/types/problem";
 
-const DEFAULT_TYPE_CODE: ProblemTypeCode = "FRA_ADD_001";
-const DEFAULT_DIFFICULTY: ProblemDifficulty = "normal";
 const CHOICE_COUNT = 5;
 const DISTRACTOR_COUNT = CHOICE_COUNT - 1;
 const MAX_PROBLEM_ATTEMPTS = 30;
@@ -57,25 +51,12 @@ const DIFFICULTY_CONFIG: Record<ProblemDifficulty, DifficultyConfig> = {
   },
 };
 
-export const difficultyLabels: Record<ProblemDifficulty, string> = {
-  easy: "쉬움",
-  normal: "보통",
-  hard: "어려움",
-};
-
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function randomFromRange([min, max]: [number, number]): number {
   return randomInt(min, max);
-}
-
-function getProblemTypeTitle(typeCode: ProblemTypeCode): string {
-  return (
-    elementaryGrade5FractionAdditionTypes.find((type) => type.code === typeCode)?.title ??
-    "분수 덧셈"
-  );
 }
 
 function makeSameDenominatorPair(config: DifficultyConfig): [Fraction, Fraction] {
@@ -124,12 +105,6 @@ function makeCoprimeDenominatorPair(config: DifficultyConfig): [Fraction, Fracti
     { numerator: randomInt(1, leftDenominator - 1), denominator: leftDenominator },
     { numerator: randomInt(1, rightDenominator - 1), denominator: rightDenominator },
   ];
-}
-
-function makeFractionPair(typeCode: ProblemTypeCode, config: DifficultyConfig): [Fraction, Fraction] {
-  if (typeCode === "FRA_ADD_002") return makeMultipleDenominatorPair(config);
-  if (typeCode === "FRA_ADD_003") return makeCoprimeDenominatorPair(config);
-  return makeSameDenominatorPair(config);
 }
 
 function uniqueFormattedFractions(fractions: Fraction[], answerText: string): string[] {
@@ -189,13 +164,19 @@ function makeFiveChoices(answer: Fraction, difficulty: ProblemDifficulty): strin
   return shuffleArray(choices);
 }
 
+export interface FractionAdditionGeneratorContext {
+  problemType: ProblemTypeDefinition;
+  difficulty: ProblemDifficulty;
+  index: number;
+}
+
 function createProblemOnce(
-  typeCode: ProblemTypeCode,
-  difficulty: ProblemDifficulty,
-  index: number
-): MultipleChoiceProblem {
+  context: FractionAdditionGeneratorContext,
+  makeFractionPair: (config: DifficultyConfig) => [Fraction, Fraction]
+): GeneratedProblem {
+  const { problemType, difficulty, index } = context;
   const config = DIFFICULTY_CONFIG[difficulty];
-  const [left, right] = makeFractionPair(typeCode, config);
+  const [left, right] = makeFractionPair(config);
   const answer = addFractions(left, right);
   const answerText = formatFraction(answer);
   const commonDenominator = left.denominator * right.denominator;
@@ -209,52 +190,50 @@ function createProblemOnce(
   };
 
   return {
-    id: index + 1,
-    question: `${getProblemTypeTitle(typeCode)}: ${formatFraction(left)} + ${formatFraction(right)}을 계산하세요.`,
-    options: makeFiveChoices(answer, difficulty),
+    id: String(index + 1),
+    question: `${problemType.typeName}: ${formatFraction(left)} + ${formatFraction(right)}을 계산하세요.`,
+    choices: makeFiveChoices(answer, difficulty),
     answer: answerText,
-    explanation: `통분하면 ${formatFraction(convertedLeft)} + ${formatFraction(convertedRight)}입니다. 분자를 더해 ${formatFraction({
+    solution: `통분하면 ${formatFraction(convertedLeft)} + ${formatFraction(convertedRight)}입니다. 분자를 더해 ${formatFraction({
       numerator: convertedLeft.numerator + convertedRight.numerator,
       denominator: commonDenominator,
     })}을 만들고, 약분하면 ${answerText}입니다.`,
+    grade: problemType.grade,
+    unit: problemType.unit,
+    topic: problemType.topic,
+    problemTypeId: problemType.id,
+    difficulty,
   };
 }
 
 function createProblem(
-  typeCode: ProblemTypeCode,
-  difficulty: ProblemDifficulty,
-  index: number
-): MultipleChoiceProblem {
+  context: FractionAdditionGeneratorContext,
+  makeFractionPair: (config: DifficultyConfig) => [Fraction, Fraction]
+): GeneratedProblem {
   for (let attempt = 0; attempt < MAX_PROBLEM_ATTEMPTS; attempt += 1) {
-    const problem = createProblemOnce(typeCode, difficulty, index);
-    if (problem.options.length === CHOICE_COUNT) {
+    const problem = createProblemOnce(context, makeFractionPair);
+    if (problem.choices.length === CHOICE_COUNT) {
       return problem;
     }
   }
 
-  throw new Error(`Failed to generate a ${CHOICE_COUNT}-choice problem for ${typeCode}.`);
+  throw new Error(`Failed to generate a ${CHOICE_COUNT}-choice problem for ${context.problemType.id}.`);
 }
 
-export function getFractionAdditionProblemTypes() {
-  return elementaryGrade5FractionAdditionTypes;
+export function generateSameDenominatorFractionAdditionProblem(
+  context: FractionAdditionGeneratorContext
+): GeneratedProblem {
+  return createProblem(context, makeSameDenominatorPair);
 }
 
-export function getFractionAdditionExamMetadata(
-  typeCode: ProblemTypeCode,
-  difficulty: ProblemDifficulty = DEFAULT_DIFFICULTY
-): Pick<ProblemsPayload, "title" | "subtitle"> {
-  return {
-    title: "초등 5학년 분수 덧셈",
-    subtitle: `${getProblemTypeTitle(typeCode)} · 난이도: ${difficultyLabels[difficulty]}`,
-  };
+export function generateMultipleDenominatorFractionAdditionProblem(
+  context: FractionAdditionGeneratorContext
+): GeneratedProblem {
+  return createProblem(context, makeMultipleDenominatorPair);
 }
 
-export function generateFractionAdditionProblems({
-  typeCode = DEFAULT_TYPE_CODE,
-  count,
-  difficulty = DEFAULT_DIFFICULTY,
-}: GenerateProblemsOptions): MultipleChoiceProblem[] {
-  const problems = Array.from({ length: count }, (_, index) => createProblem(typeCode, difficulty, index));
-  validateFiveChoiceProblems(problems);
-  return problems;
+export function generateCoprimeDenominatorFractionAdditionProblem(
+  context: FractionAdditionGeneratorContext
+): GeneratedProblem {
+  return createProblem(context, makeCoprimeDenominatorPair);
 }
