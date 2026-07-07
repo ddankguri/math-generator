@@ -2,29 +2,25 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import MathText from "./MathText";
-import problemsData from "../problems.json";
-
-// Type definitions based on problems.json
-interface Problem {
-  id: number;
-  question: string;
-  options: string[];
-  answer: string;
-  explanation: string;
-}
-
-interface ProblemsPayload {
-  title: string;
-  subtitle: string;
-  problems: Problem[];
-}
-
-const typedProblemsData = problemsData as ProblemsPayload;
+import {
+  difficultyLabels,
+  generateFractionAdditionProblems,
+  getFractionAdditionExamMetadata,
+  getFractionAdditionProblemTypes,
+} from "@/engine/generators/fractionAdditionGenerator";
+import { validateFiveChoiceProblems } from "@/engine/validators/problem";
+import { exportExamPaperPdf } from "@/pdf/exportExamPaperPdf";
+import type { MultipleChoiceProblem, ProblemDifficulty, ProblemTypeCode } from "@/types/problem";
 
 export default function ExamPaper() {
+  const problemTypes = getFractionAdditionProblemTypes();
+
   // Problems state
-  const [problems, setProblems] = useState<Problem[]>([]);
+  const [problems, setProblems] = useState<MultipleChoiceProblem[]>([]);
   const [selectedCount, setSelectedCount] = useState<number>(5); // Default to 5 questions
+  const [selectedProblemType, setSelectedProblemType] = useState<ProblemTypeCode>("FRA_ADD_001");
+  const [selectedDifficulty, setSelectedDifficulty] = useState<ProblemDifficulty>("normal");
+  const examMetadata = getFractionAdditionExamMetadata(selectedProblemType, selectedDifficulty);
 
   // Modes: 'practice' (연습 모드) | 'exam' (실전 시험 모드)
   const [mode, setMode] = useState<"practice" | "exam">("practice");
@@ -47,34 +43,24 @@ export default function ExamPaper() {
   const examPaperRef = useRef<HTMLDivElement>(null);
 
   // circular number symbols
-  const circleNumbers = ["①", "②", "③", "④"];
-
-  // Helper to shuffle problems randomly
-  const shuffleArray = (array: Problem[]) => {
-    const newArr = [...array];
-    for (let i = newArr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
-    }
-    return newArr;
-  };
+  const circleNumbers = ["①", "②", "③", "④", "⑤"];
 
   // Generate a new test from the pool
-  const generateNewExam = (count: number) => {
-    const totalCount = typedProblemsData.problems.length;
-    const resolvedCount = Math.min(count, totalCount);
+  const generateNewExam = (
+    count: number,
+    typeCode = selectedProblemType,
+    difficulty = selectedDifficulty
+  ) => {
+    let generatedProblems = generateFractionAdditionProblems({ count, typeCode, difficulty });
 
-    const shuffled = shuffleArray(typedProblemsData.problems).slice(0, resolvedCount);
-    // Sort by original ID to keep a natural flow of content difficulty
-    shuffled.sort((a, b) => a.id - b.id);
-    
-    // Re-index problems sequentially from 1 to count
-    const remapped = shuffled.map((prob, index) => ({
-      ...prob,
-      id: index + 1,
-    }));
+    try {
+      validateFiveChoiceProblems(generatedProblems);
+    } catch {
+      generatedProblems = generateFractionAdditionProblems({ count, typeCode, difficulty });
+      validateFiveChoiceProblems(generatedProblems);
+    }
 
-    setProblems(remapped);
+    setProblems(generatedProblems);
     setUserAnswers({});
     setIsSubmitted(false);
     setExpandedExplanations({});
@@ -83,7 +69,7 @@ export default function ExamPaper() {
 
   // Initialize with 5 random problems on mount
   useEffect(() => {
-    generateNewExam(5);
+    generateNewExam(5, "FRA_ADD_001", "normal");
   }, []);
 
   // Timer Effect
@@ -186,155 +172,26 @@ export default function ExamPaper() {
 
   // Download PDF using html2canvas and jsPDF (Import dynamically to prevent SSR errors)
   const handleDownloadPdf = async () => {
-    // 2. Element presence validation check
     if (!examPaperRef.current) {
-      alert("오류: PDF로 변환할 시험지 영역(Element)을 찾을 수 없습니다.");
+      alert("PDF export target was not found.");
       return;
     }
-    
+
     setIsDownloadingPdf(true);
 
     try {
-      // 1. Introduce a delay (800ms) to allow layout/KaTeX to fully render
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      const html2canvas = (await import("html2canvas")).default;
-      const { jsPDF } = await import("jspdf");
-
-      const element = examPaperRef.current;
-      
-      // Secondary check after dynamic loading & timeout
-      if (!element) {
-        throw new Error("시험지 영역(Element)이 DOM에서 소실되었습니다.");
-      }
-
-      // Capture the element using html2canvas with specific debug logging and CORS support
-      const canvas = await html2canvas(element, {
-        scale: 2, // High DPI scaling
-        useCORS: true, // Enable CORS support for external assets
-        logging: true, // Enable verbose debug logging to developer console
-        backgroundColor: "#ffffff",
-        onclone: (clonedDoc) => {
-          // A. Clean up stylesheets to remove oklch/lab functions to prevent parsing crashes
-          const styles = clonedDoc.querySelectorAll("style");
-          styles.forEach((styleTag) => {
-            let cssText = styleTag.textContent || "";
-            if (cssText.includes("oklch") || cssText.includes("lab")) {
-              // Replace oklch(...) and lab(...) color patterns with transparent to prevent html2canvas parser crashes
-              cssText = cssText.replace(/oklch\([^)]+\)/g, "transparent");
-              cssText = cssText.replace(/lab\([^)]+\)/g, "transparent");
-              styleTag.textContent = cssText;
-            }
-          });
-
-          // B. Find and style the target exam paper in clone
-          const clonedElement = clonedDoc.querySelector("[data-exam-paper]") as HTMLElement;
-          if (clonedElement) {
-            // Force strict printer-friendly styling on the container
-            clonedElement.style.width = "820px";
-            clonedElement.style.padding = "40px";
-            clonedElement.style.backgroundColor = "#ffffff";
-            clonedElement.style.color = "#000000";
-            clonedElement.style.borderColor = "#000000";
-            clonedElement.style.boxShadow = "none";
-            clonedElement.style.border = "1px solid #000000";
-            clonedElement.style.borderRadius = "0";
-
-            // Hide the PDF Download and other print-excluded buttons
-            const noPrintElements = clonedElement.querySelectorAll(".no-print");
-            noPrintElements.forEach((el) => {
-              (el as HTMLElement).style.setProperty("display", "none", "important");
-            });
-
-            // C. Resolve computed colors to standard RGB and apply inline to all descendants
-            const allDescendants = clonedElement.querySelectorAll("*");
-            allDescendants.forEach((el) => {
-              const htmlEl = el as HTMLElement;
-              
-              try {
-                // Get the computed style of the element
-                const computed = window.getComputedStyle(htmlEl);
-                
-                let bgColor = computed.backgroundColor;
-                let textColor = computed.color;
-                let borderColor = computed.borderColor;
-
-                // Clean out any oklch/lab values and fall back
-                if (bgColor && (bgColor.includes("oklch") || bgColor.includes("lab"))) {
-                  bgColor = "transparent";
-                }
-                if (textColor && (textColor.includes("oklch") || textColor.includes("lab"))) {
-                  textColor = "#000000";
-                }
-                if (borderColor && (borderColor.includes("oklch") || borderColor.includes("lab"))) {
-                  borderColor = "#000000";
-                }
-
-                // Force printer-friendly color conversions as inline styles (highest specificity)
-                htmlEl.style.backgroundColor = bgColor;
-                htmlEl.style.color = "#000000"; // Always black ink for printed text
-                htmlEl.style.borderColor = borderColor;
-              } catch (e) {
-                // Fallback if computed styles fail
-                htmlEl.style.color = "#000000";
-              }
-
-              if (htmlEl.tagName === "BUTTON") {
-                htmlEl.style.borderColor = "#000000";
-                htmlEl.style.backgroundColor = "transparent";
-              }
-            });
-
-            // Force black ink on KaTeX math blocks recursively
-            const mathTexts = clonedElement.querySelectorAll(".inline-math");
-            mathTexts.forEach((el) => {
-              (el as HTMLElement).style.setProperty("color", "#000000", "important");
-              const mathSpans = el.querySelectorAll("*");
-              mathSpans.forEach((s) => {
-                (s as HTMLElement).style.setProperty("color", "#000000", "important");
-              });
-            });
-          }
-        },
+      await exportExamPaperPdf({
+        element: examPaperRef.current,
+        studentName,
       });
-
-      const imgData = canvas.toDataURL("image/png");
-
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-
-      const imgWidth = 210; // A4 width
-      const pageHeight = 297; // A4 height
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      // Add first page
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, "FAST");
-      heightLeft -= pageHeight;
-
-      // Add subsequent pages if it exceeds single A4 page
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, "FAST");
-        heightLeft -= pageHeight;
-      }
-
-      const filename = `${studentName.trim() || "math"}_시험지.pdf`;
-      pdf.save(filename);
-    } catch (error: any) {
-      // 3. Error reporting using console.error and alert box
+    } catch (error: unknown) {
       console.error("PDF generation failed with exception:", error);
-      alert(`PDF 다운로드 중 문제가 발생했습니다.\n에러 내용: ${error?.message || error}`);
+      const message = error instanceof Error ? error.message : String(error);
+      alert(`PDF download failed.\nError: ${message}`);
     } finally {
       setIsDownloadingPdf(false);
     }
   };
-
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 md:py-12 select-none print:p-0 print:m-0 print:max-w-full">
@@ -357,6 +214,36 @@ export default function ExamPaper() {
           
           {/* 1. Problem Count Selector & Generate Button */}
           <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
+            <label htmlFor="type-select" className="text-xs font-bold text-zinc-500 dark:text-zinc-400 pl-2">
+              유형:
+            </label>
+            <select
+              id="type-select"
+              value={selectedProblemType}
+              onChange={(e) => setSelectedProblemType(e.target.value as ProblemTypeCode)}
+              className="bg-transparent text-zinc-700 dark:text-zinc-300 text-xs md:text-sm font-bold border-0 focus:ring-0 focus:outline-none cursor-pointer py-1.5 px-1 pr-8 max-w-[220px]"
+            >
+              {problemTypes.map((type) => (
+                <option key={type.code} value={type.code}>
+                  {type.code} - {type.title}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="difficulty-select" className="text-xs font-bold text-zinc-500 dark:text-zinc-400 pl-2">
+              난이도:
+            </label>
+            <select
+              id="difficulty-select"
+              value={selectedDifficulty}
+              onChange={(e) => setSelectedDifficulty(e.target.value as ProblemDifficulty)}
+              className="bg-transparent text-zinc-700 dark:text-zinc-300 text-xs md:text-sm font-bold border-0 focus:ring-0 focus:outline-none cursor-pointer py-1.5 px-1 pr-8"
+            >
+              {(["easy", "normal", "hard"] as ProblemDifficulty[]).map((difficulty) => (
+                <option key={difficulty} value={difficulty}>
+                  {difficultyLabels[difficulty]}
+                </option>
+              ))}
+            </select>
             <label htmlFor="count-select" className="text-xs font-bold text-zinc-500 dark:text-zinc-400 pl-2">
               출제:
             </label>
@@ -371,7 +258,7 @@ export default function ExamPaper() {
               <option value={8}>8문제(전체)</option>
             </select>
             <button
-              onClick={() => generateNewExam(selectedCount)}
+              onClick={() => generateNewExam(selectedCount, selectedProblemType, selectedDifficulty)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-colors shadow-sm"
             >
               시험지 생성
@@ -511,10 +398,10 @@ export default function ExamPaper() {
             {/* Title Block */}
             <div className="flex-1">
               <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight font-serif print:text-2xl">
-                {typedProblemsData.title}
+                {examMetadata.title}
               </h1>
               <p className="text-sm md:text-base text-zinc-600 dark:text-zinc-400 mt-1 font-medium font-serif print:text-zinc-600">
-                {typedProblemsData.subtitle}
+                {examMetadata.subtitle}
               </p>
             </div>
             
@@ -595,6 +482,10 @@ export default function ExamPaper() {
             )}
             
             {problems.map((problem) => {
+              if (problem.options.length !== 5) {
+                throw new Error(`Problem ${problem.id} must render exactly 5 choices.`);
+              }
+
               const selectedAnswer = userAnswers[problem.id];
               const isCorrect = selectedAnswer === problem.answer;
               const hasAnswered = !!selectedAnswer;
@@ -758,6 +649,22 @@ export default function ExamPaper() {
             })}
           </div>
 
+          <div className="hidden print-only mt-12 pt-8 border-t border-zinc-900 font-serif">
+            <h2 className="text-lg font-extrabold mb-4">정답 및 풀이</h2>
+            <div className="space-y-4">
+              {problems.map((problem) => (
+                <div key={`answer-${problem.id}`} className="text-sm leading-relaxed break-inside-avoid">
+                  <div className="font-bold mb-1">
+                    {problem.id}. 정답: <MathText text={problem.answer} />
+                  </div>
+                  <div>
+                    풀이: <MathText text={problem.explanation} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* End of Exam Paper signature block (traditional look) */}
           <div className="mt-12 pt-8 border-t border-zinc-900 dark:border-zinc-600 text-center font-serif">
             <p className="text-sm tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
@@ -831,12 +738,13 @@ export default function ExamPaper() {
 
             {/* OMR Card Body */}
             <div className="p-5 flex flex-col gap-4">
-              <div className="grid grid-cols-5 gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 text-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+              <div className="grid grid-cols-6 gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 text-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                 <div className="text-left pl-1">NO.</div>
                 <div>①</div>
                 <div>②</div>
                 <div>③</div>
                 <div>④</div>
+                <div>⑤</div>
               </div>
 
               {totalProblems === 0 ? (
@@ -850,7 +758,7 @@ export default function ExamPaper() {
                     const isCorrect = selectedAnswer === prob.answer;
 
                     return (
-                      <div key={prob.id} className="grid grid-cols-5 gap-2 items-center text-center">
+                      <div key={prob.id} className="grid grid-cols-6 gap-2 items-center text-center">
                         
                         {/* OMR Item Number */}
                         <div className="text-left pl-1 text-xs font-bold font-mono text-zinc-500">
