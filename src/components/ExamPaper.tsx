@@ -732,11 +732,18 @@ export default function ExamPaper() {
                           </div>
                           <div>
                             <span className="font-semibold text-zinc-900 dark:text-white">정답: </span>
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                              {circleNumbers[problem.answerChoiceIndex]}{" "}
+                            </span>
                             <MathText text={problem.answer} />
                           </div>
-                          <div className="mt-2 text-zinc-600 dark:text-zinc-400 font-serif">
-                            <MathText text={problem.solution} />
-                          </div>
+                          <ol className="mt-2 space-y-1 text-zinc-600 dark:text-zinc-400 font-serif list-decimal list-inside">
+                            {problem.solutionSteps.map((step, stepIdx) => (
+                              <li key={`${problem.id}-step-${stepIdx}`}>
+                                <MathText text={step} />
+                              </li>
+                            ))}
+                          </ol>
                         </div>
                       )}
                     </div>
@@ -751,12 +758,21 @@ export default function ExamPaper() {
             <div className="space-y-4">
               {problems.map((problem) => (
                 <div key={`answer-${problem.id}`} className="text-sm leading-relaxed break-inside-avoid">
-                  <div className="font-bold mb-1">
-                    {problem.id}. 정답: <MathText text={problem.answer} />
+                  <div className="font-extrabold mb-1">
+                    문제 {problem.id}
                   </div>
                   <div>
-                    풀이: <MathText text={problem.solution} />
+                    <span className="font-bold">정답: </span>
+                    {circleNumbers[problem.answerChoiceIndex]}
                   </div>
+                  <div className="font-bold mt-1">풀이:</div>
+                  <ol className="space-y-1">
+                    {problem.solutionSteps.map((step, stepIdx) => (
+                      <li key={`print-${problem.id}-step-${stepIdx}`}>
+                        {stepIdx + 1}) <MathText text={step} />
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               ))}
             </div>

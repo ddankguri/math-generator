@@ -59,6 +59,21 @@ function randomFromRange([min, max]: [number, number]): number {
   return randomInt(min, max);
 }
 
+function greatestCommonDivisor(left: number, right: number): number {
+  let a = Math.abs(left);
+  let b = Math.abs(right);
+
+  while (b !== 0) {
+    [a, b] = [b, a % b];
+  }
+
+  return a || 1;
+}
+
+function leastCommonMultiple(left: number, right: number): number {
+  return (left * right) / greatestCommonDivisor(left, right);
+}
+
 function makeSameDenominatorPair(config: DifficultyConfig): [Fraction, Fraction] {
   const denominator = randomFromRange(config.sameDenominatorRange);
   const leftNumerator = randomInt(1, denominator - 2);
@@ -179,25 +194,42 @@ function createProblemOnce(
   const [left, right] = makeFractionPair(config);
   const answer = addFractions(left, right);
   const answerText = formatFraction(answer);
-  const commonDenominator = left.denominator * right.denominator;
+  const commonDenominator = leastCommonMultiple(left.denominator, right.denominator);
   const convertedLeft = {
-    numerator: left.numerator * right.denominator,
+    numerator: left.numerator * (commonDenominator / left.denominator),
     denominator: commonDenominator,
   };
   const convertedRight = {
-    numerator: right.numerator * left.denominator,
+    numerator: right.numerator * (commonDenominator / right.denominator),
     denominator: commonDenominator,
   };
+  const addedFraction = {
+    numerator: convertedLeft.numerator + convertedRight.numerator,
+    denominator: commonDenominator,
+  };
+  const addedFractionText = formatFraction(addedFraction);
+  const choices = makeFiveChoices(answer, difficulty);
+  const answerChoiceIndex = choices.indexOf(answerText);
+  const isAlreadySimplified =
+    addedFraction.numerator === answer.numerator && addedFraction.denominator === answer.denominator;
+  const solutionSteps = [
+    left.denominator === right.denominator
+      ? `분모가 이미 같으므로 ${formatFraction(left)} + ${formatFraction(right)}로 바로 분자끼리 더할 수 있습니다.`
+      : `분모를 ${commonDenominator}로 통분하면 ${formatFraction(left)} = ${formatFraction(convertedLeft)}, ${formatFraction(right)} = ${formatFraction(convertedRight)}입니다.`,
+    `분자를 더하면 ${formatFraction(convertedLeft)} + ${formatFraction(convertedRight)} = ${addedFractionText}입니다.`,
+    isAlreadySimplified
+      ? `${addedFractionText}는 더 이상 약분할 수 없으므로 정답은 ${answerText}입니다.`
+      : `${addedFractionText}를 약분하면 ${answerText}이므로 정답은 ${answerText}입니다.`,
+  ];
 
   return {
     id: String(index + 1),
     question: `${problemType.typeName}: ${formatFraction(left)} + ${formatFraction(right)}을 계산하세요.`,
-    choices: makeFiveChoices(answer, difficulty),
+    choices,
     answer: answerText,
-    solution: `통분하면 ${formatFraction(convertedLeft)} + ${formatFraction(convertedRight)}입니다. 분자를 더해 ${formatFraction({
-      numerator: convertedLeft.numerator + convertedRight.numerator,
-      denominator: commonDenominator,
-    })}을 만들고, 약분하면 ${answerText}입니다.`,
+    answerChoiceIndex,
+    solution: solutionSteps.join(" "),
+    solutionSteps,
     grade: problemType.grade,
     unit: problemType.unit,
     topic: problemType.topic,
@@ -212,7 +244,7 @@ function createProblem(
 ): GeneratedProblem {
   for (let attempt = 0; attempt < MAX_PROBLEM_ATTEMPTS; attempt += 1) {
     const problem = createProblemOnce(context, makeFractionPair);
-    if (problem.choices.length === CHOICE_COUNT) {
+    if (problem.choices.length === CHOICE_COUNT && problem.choices[problem.answerChoiceIndex] === problem.answer) {
       return problem;
     }
   }

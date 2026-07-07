@@ -68,7 +68,9 @@ export interface GeneratedProblem {
   question: string;
   choices: string[];
   answer: string;
+  answerChoiceIndex: number;
   solution: string;
+  solutionSteps: string[];
   grade: string;
   unit: string;
   topic: string;
