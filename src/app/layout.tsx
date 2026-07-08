@@ -1,3 +1,4 @@
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
@@ -21,7 +22,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SiteHeader />
+        {children}
+        <SiteFooter />
+      </body>
       <Script
         async
         src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5833246063718895"
