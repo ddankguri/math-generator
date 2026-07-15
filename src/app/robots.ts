@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { siteConfig } from "@/config/site";
 
 export const dynamic = "force-static";
 
@@ -8,6 +9,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://math-generator.pages.dev/sitemap.xml",
+    sitemap: `${siteConfig.url}/sitemap.xml`,
+    host: siteConfig.url,
   };
 }

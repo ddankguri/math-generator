@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
+import { createPageMetadata } from "@/config/site";
 
-export const metadata: Metadata = {
-  title: "문의",
-  description: "MathGenerator 오류 제보, 개선 제안, 개인정보 문의 안내입니다.",
-};
+export const metadata = createPageMetadata({ title: "문의 안내", description: "MathGenerator의 문제 오류, 풀이 개선, 단원 제안과 개인정보 관련 문의 방법을 안내합니다.", path: "/contact" });
 
 export default function ContactPage() {
   return (

@@ -87,9 +87,29 @@ export default function ExamPaper() {
     setTimeElapsed(0);
   };
 
-  // Initialize with 5 random problems on mount
+  // Initialize from a validated learning-page link, or fall back to the default type.
   useEffect(() => {
-    generateNewExam(5, "FRA_ADD_001", "normal");
+    const timeoutId = window.setTimeout(() => {
+      const query = new URLSearchParams(window.location.search);
+      const requestedType = query.get("type");
+      const matchedType = allProblemTypes.find((type) =>
+        type.id === requestedType &&
+        type.grade === "초등 5학년" &&
+        type.unit === "분수" &&
+        type.topic === "분수의 덧셈"
+      );
+
+      const initialType = matchedType?.id ?? "FRA_ADD_001";
+      if (matchedType) {
+        setSelectedGrade(matchedType.grade);
+        setSelectedUnit(matchedType.unit);
+        setSelectedTopic(matchedType.topic);
+        setSelectedProblemType(matchedType.id);
+      }
+      generateNewExam(5, initialType, "normal");
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {
@@ -243,7 +263,7 @@ export default function ExamPaper() {
     <div className="w-full max-w-7xl mx-auto px-4 py-8 md:py-12 select-none print:p-0 print:m-0 print:max-w-full">
       
       {/* Upper Navigation/Controls (Hidden during printing) */}
-      <div className="no-print mb-8 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 md:p-6 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div id="generator-controls" className="no-print mb-8 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 md:p-6 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         
         {/* Left: Info */}
         <div className="flex flex-col gap-1">

@@ -19,11 +19,17 @@ export function SiteHeader() {
           <Link href="/#guide" className="hover:text-indigo-600 dark:hover:text-indigo-300">
             학습 가이드
           </Link>
+          <Link href="/learn" className="hover:text-indigo-600 dark:hover:text-indigo-300">
+            개념 학습
+          </Link>
           <Link href="/about" className="hover:text-indigo-600 dark:hover:text-indigo-300">
             소개
           </Link>
           <Link href="/privacy" className="hover:text-indigo-600 dark:hover:text-indigo-300">
             개인정보처리방침
+          </Link>
+          <Link href="/terms" className="hover:text-indigo-600 dark:hover:text-indigo-300">
+            이용약관
           </Link>
           <Link href="/contact" className="hover:text-indigo-600 dark:hover:text-indigo-300">
             문의
@@ -46,6 +52,9 @@ export function SiteFooter() {
           </p>
         </div>
         <nav className="flex flex-wrap gap-3 font-semibold">
+          <Link href="/learn" className="hover:text-indigo-600 dark:hover:text-indigo-300">
+            개념 학습
+          </Link>
           <Link href="/about" className="hover:text-indigo-600 dark:hover:text-indigo-300">
             소개
           </Link>
@@ -59,6 +68,7 @@ export function SiteFooter() {
             문의
           </Link>
         </nav>
+        <p className="md:col-span-2 border-t border-zinc-200 pt-5 text-xs dark:border-zinc-800">© {new Date().getFullYear()} MathGenerator. 교육 목적의 학습 도구입니다.</p>
       </div>
     </footer>
   );

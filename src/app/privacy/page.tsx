@@ -1,10 +1,7 @@
-import type { Metadata } from "next";
+import { createPageMetadata } from "@/config/site";
 import Link from "next/link";
 
-export const metadata: Metadata = {
-  title: "개인정보처리방침",
-  description: "MathGenerator의 개인정보 처리와 광고 관련 안내입니다.",
-};
+export const metadata = createPageMetadata({ title: "개인정보처리방침", description: "MathGenerator의 개인정보 수집 여부, 브라우저 저장소, 쿠키와 제3자 광고 서비스 이용 가능성을 안내합니다.", path: "/privacy" });
 
 export default function PrivacyPage() {
   return (
@@ -14,7 +11,7 @@ export default function PrivacyPage() {
           MathGenerator
         </Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">개인정보처리방침</h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">최종 업데이트: 2026년 7월 8일</p>
+        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">최종 업데이트: 2026년 7월 15일</p>
         <div className="mt-6 space-y-6 leading-7 text-zinc-700 dark:text-zinc-300">
           <section>
             <h2 className="text-xl font-extrabold text-zinc-950 dark:text-white">수집하는 정보</h2>
@@ -24,10 +21,15 @@ export default function PrivacyPage() {
             </p>
           </section>
           <section>
+            <h2 className="text-xl font-extrabold text-zinc-950 dark:text-white">브라우저 저장소</h2>
+            <p className="mt-3">현재 사이트는 생성한 문제, 답안, 수험번호, 이름을 localStorage나 sessionStorage에 저장하지 않습니다. 페이지를 닫거나 새로고침하면 화면 상태가 유지되지 않을 수 있습니다.</p>
+          </section>
+          <section>
             <h2 className="text-xl font-extrabold text-zinc-950 dark:text-white">광고와 쿠키</h2>
             <p className="mt-3">
               이 사이트는 Google AdSense를 사용할 수 있습니다. Google과 파트너는 광고 제공과 광고 품질 측정을 위해 쿠키 또는
-              유사 기술을 사용할 수 있으며, 사용자는 브라우저 설정 또는 Google 광고 설정에서 맞춤 광고를 관리할 수 있습니다.
+              유사 기술을 사용할 수 있습니다. 사이트 운영자가 자체적으로 로그인 쿠키를 발급하지는 않지만, 제3자 광고 서비스의
+              쿠키 처리에는 해당 서비스의 정책이 적용됩니다. 사용자는 브라우저 설정 또는 Google 광고 설정에서 맞춤 광고를 관리할 수 있습니다.
             </p>
           </section>
           <section>
@@ -40,8 +42,8 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-extrabold text-zinc-950 dark:text-white">문의</h2>
             <p className="mt-3">
-              개인정보 처리와 관련한 문의는 <Link href="/contact" className="font-bold text-indigo-600 dark:text-indigo-300">문의 페이지</Link>를
-              통해 남길 수 있습니다.
+              개인정보 처리와 관련한 문의 방법은 <Link href="/contact" className="font-bold text-indigo-600 dark:text-indigo-300">문의 페이지</Link>에서
+              확인할 수 있습니다.
             </p>
           </section>
         </div>
